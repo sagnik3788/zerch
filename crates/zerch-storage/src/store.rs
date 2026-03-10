@@ -20,6 +20,9 @@ impl VectorStore {
             .append(true)
             .open(&self.path)?;
 
+        let len = vector.len() as u32;
+        file.write_all(&len.to_le_bytes())?;
+
         // change this line
         let bytes = unsafe {
             std::slice::from_raw_parts(
