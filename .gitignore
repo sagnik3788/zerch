@@ -1,5 +1,3 @@
 /target
 /models--sentence-transformers--all-MiniLM-L6-v2
 /HDFS.log
-test.log
-zerch_data.bin
