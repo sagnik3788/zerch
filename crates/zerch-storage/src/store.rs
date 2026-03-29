@@ -13,25 +13,33 @@ impl VectorStore {
         Self { path: path.into() }
     }
 
-    // dump the vector into the bin , &[f32] for no copy of vector
-    pub fn append_vector(&self, vector: &[f32]) -> Result<()> {
+    // dump the vector into the bin , &[f32] for no copy of vector, along with the text
+    pub fn append_vector(&self, vector: &[f32], text: &str) -> Result<()> {
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&self.path)?;
 
-        let len = vector.len() as u32;
-        file.write_all(&len.to_le_bytes())?;
+        // Write the length of the vector
+        let vector_len = vector.len() as u32;
+        file.write_all(&vector_len.to_le_bytes())?;
 
-        // change this line
+        // Write the vector data itself
         let bytes = unsafe {
             std::slice::from_raw_parts(
                 vector.as_ptr() as *const u8,
                 vector.len() * std::mem::size_of::<f32>(),
             )
         };
-
         file.write_all(bytes)?;
+
+        // Write the length of the text
+        let text_len = text.len() as u32;
+        file.write_all(&text_len.to_le_bytes())?;
+
+        // Write the text bytes
+        file.write_all(text.as_bytes())?;
+
         file.flush()?;
 
         Ok(())

@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 zerch-embed = { path = "../zerch-embed" }
 zerch-storage = { path = "../zerch-storage" }
+zerch-core = { path = "../zerch-core" }
 anyhow = "1.0"
