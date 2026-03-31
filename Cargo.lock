@@ -2698,6 +2698,7 @@ name = "zerch-engine"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "zerch-core",
  "zerch-embed",
  "zerch-storage",
 ]
