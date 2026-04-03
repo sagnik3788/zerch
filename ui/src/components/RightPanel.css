@@ -140,3 +140,63 @@
 .incident-time {
     color: var(--text-muted);
 }
+
+/* AI Summary Panel Styles */
+.summary-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+    animation: slideIn 0.3s ease-out;
+}
+
+.summary-panel.is-loading {
+    border-color: rgba(79, 142, 247, 0.3);
+    background: linear-gradient(135deg, var(--bg-surface), rgba(79, 142, 247, 0.05));
+}
+
+.summary-loading {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.shimmer-line {
+    height: 12px;
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.05) 25%,
+            rgba(255, 255, 255, 0.1) 50%,
+            rgba(255, 255, 255, 0.05) 75%);
+    background-size: 200% 100%;
+    border-radius: 4px;
+    animation: shimmer 1.5s infinite linear;
+}
+
+.shimmer-line.shorter {
+    width: 60%;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}

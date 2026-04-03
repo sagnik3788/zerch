@@ -1,16 +1,16 @@
-# Zerch
+# Zerch-pvt
 
 A vector search engine for logs.
 
 ## Architecture(will update)
 
 ```
-Zerch/
+Zerch-pvt/
 ├── crates/
-│   ├── zerch-core      
-│   ├── zerch-embed     
-│   ├── zerch-storage   
-│   └── zerch-engine    
+│   ├── zerch-pvt-core      
+│   ├── zerch-pvt-embed     
+│   ├── zerch-pvt-storage   
+│   └── zerch-pvt-engine    
 ```
 
 ## Getting Started
