@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLogs } from '../hooks/useLogs';
+import { API_ENDPOINTS } from '../config/api';
 import Topbar from '../components/Topbar';
 import LogPanel from '../components/LogPanel';
 import RightPanel from '../components/RightPanel';
@@ -35,9 +36,8 @@ function DashboardPage() {
     setSearchQuery(query);
     setAiSummary(''); // Clear summary
 
-
     try {
-      const response = await fetch(`http://localhost:8080/api/search?q=${encodeURIComponent(query)}&limit=5`);
+      const response = await fetch(`${API_ENDPOINTS.search}?q=${encodeURIComponent(query)}&limit=5`);
       if (!response.ok) {
         throw new Error(`Search failed: ${response.statusText}`);
       }
@@ -77,7 +77,7 @@ function DashboardPage() {
   const handleSummarize = async (text) => {
     setIsSummarizing(true);
     try {
-      const response = await fetch('http://localhost:8080/api/summarize', {
+      const response = await fetch(API_ENDPOINTS.summarize, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -169,7 +169,7 @@ function DashboardPage() {
           </div>
         </div>
         <div className="status-bar__right">
-          <span className="status-item">Connected to: localhost:8080</span>
+          <span className="status-item">API: {API_ENDPOINTS.search.split('/search')[0]}</span>
         </div>
       </footer>
     </div>

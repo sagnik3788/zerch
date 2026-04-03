@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { API_ENDPOINTS } from "../config/api";
 import "./UploadSection.css";
 
 export default function UploadSection({ onUpload }) {
@@ -40,7 +41,7 @@ export default function UploadSection({ onUpload }) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("http://localhost:8080/api/upload", {
+      const response = await fetch(API_ENDPOINTS.upload, {
         method: "POST",
         body: formData,
       });
