@@ -1,0 +1,24 @@
+[package]
+name = "zerch-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+zerch-embed = { path = "../zerch-embed" }
+zerch-storage = { path = "../zerch-storage" }
+zerch-core = { path = "../zerch-core" }
+actix-web = "4.4"
+actix-rt = "2.9"
+actix-multipart = "0.4"
+actix-cors = "0.7"
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.11"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+futures-util = "0.3"
+dotenv = "0.15"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
