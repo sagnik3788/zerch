@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -7,63 +7,83 @@
 }
 
 :root {
-  --bg-base:       #0d0f14;
-  --bg-surface:    #13161e;
-  --bg-card:       #1a1e2a;
-  --bg-hover:      #1f2433;
-  --bg-input:      #151820;
-  --border:        #252a38;
-  --border-light:  #2e3447;
+  /* Neobrutalism - Light Mode (inspired by neobrutalism-templates/blog) */
+  --background: #f6f5f0;
+  --secondary-background: #ffffff;
+  --panel-background: #fef08a;
+  --foreground: #000000;
+  --main-foreground: #000000;
+  --main: #fcd34d;
+  --border: #000000;
+  --ring: #000000;
+  --overlay: rgba(0, 0, 0, 0.8);
+  --shadow: 0px 4px 0px 0px var(--border);
+  --shadow-sm: 0px 2px 0px 0px var(--border);
+  --shadow-lg: 0px 6px 0px 0px var(--border);
 
-  --text-primary:   #e4e8f5;
-  --text-secondary: #7c87a6;
-  --text-muted:     #4a5272;
+  /* Legacy variables for compatibility */
+  --bg-base: #f6f5f0;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f0ede9;
+  --bg-input: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #4a4a4a;
+  --text-muted: #8a8a8a;
 
-  --accent-blue:    #4f8ef7;
-  --accent-purple:  #8b5cf6;
-  --accent-cyan:    #22d3ee;
+  --accent-blue: #0066ff;
+  --accent-purple: #7c3aed;
+  --accent-cyan: #0891b2;
+  --accent-yellow: #fcd34d;
+  --accent-red: #dc2626;
 
-  --log-info:      #6b7db3;
-  --log-warn:      #f59e0b;
-  --log-error:     #ef4444;
-  --log-success:   #10b981;
-  --log-debug:     #8b5cf6;
+  --log-info: #0066ff;
+  --log-warn: #f59e0b;
+  --log-error: #dc2626;
+  --log-success: #16a34a;
+  --log-debug: #7c3aed;
 
-  --incident-crit: #ef4444;
+  --incident-crit: #dc2626;
   --incident-warn: #f59e0b;
-  --incident-ok:   #10b981;
+  --incident-ok: #16a34a;
 
-  --font-ui:   'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-ui: 'Inter', sans-serif;
+  --font-mono: 'Monaco', monospace;
+  --font-display: 'Inter', sans-serif;
 
-  --radius-sm: 6px;
-  --radius:    10px;
+  --radius-sm: 10px;
+  --radius: 10px;
   --radius-lg: 14px;
 
-  --shadow-sm: 0 1px 4px rgba(0,0,0,0.4);
-  --shadow:    0 4px 16px rgba(0,0,0,0.5);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
-
-  --transition: 150ms ease;
+  --transition: 0ms ease;
+  --border-width: 3px;
 }
 
-html, body, #root {
+html, body {
   height: 100%;
   width: 100%;
-  overflow: hidden;
-  background: var(--bg-base);
+  background: var(--background);
   color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: 13px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+  -webkit-font-smoothing: auto;
+  font-weight: 500;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* SCROLLBARS */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: var(--border); border: 2px solid var(--background); }
+::-webkit-scrollbar-thumb:hover { background: var(--border); }
 
 /* UTILS */
 .flex { display: flex; }
@@ -77,89 +97,156 @@ html, body, #root {
 .w-full { width: 100%; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* BADGE */
+/* BADGE - Neobrutalism Style */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 9999px;
+  padding: 4px 12px;
+  border-radius: 10px;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
+  border: 2px solid currentColor;
 }
-.badge-info    { background: rgba(107,125,179,0.15); color: var(--log-info); border: 1px solid rgba(107,125,179,0.25); }
-.badge-warn    { background: rgba(245,158,11,0.12);  color: var(--log-warn); border: 1px solid rgba(245,158,11,0.25); }
-.badge-error   { background: rgba(239,68,68,0.12);   color: var(--log-error); border: 1px solid rgba(239,68,68,0.25); }
-.badge-success { background: rgba(16,185,129,0.12);  color: var(--log-success); border: 1px solid rgba(16,185,129,0.25); }
-.badge-purple  { background: rgba(139,92,246,0.12);  color: var(--log-debug); border: 1px solid rgba(139,92,246,0.25); }
+.badge-info    { background: #e0e7ff; color: var(--log-info); border: 2px solid var(--log-info); }
+.badge-warn    { background: #fef3c7; color: #b45309; border: 2px solid #b45309; }
+.badge-error   { background: #fee2e2; color: var(--log-error); border: 2px solid var(--log-error); }
+.badge-success { background: #dcfce7; color: var(--log-success); border: 2px solid var(--log-success); }
+.badge-purple  { background: #ede9fe; color: var(--log-debug); border: 2px solid var(--log-debug); }
 
-/* BUTTON */
+/* BUTTON - Neobrutalism Style */
 button {
   font-family: var(--font-ui);
   cursor: pointer;
   border: none;
   outline: none;
   transition: all var(--transition);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 11px;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--radius-sm);
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
   font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 3px solid var(--border);
+  background: var(--secondary-background);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  transform: translate(0, 0);
 }
+
+.btn:hover {
+  background: var(--main);
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+}
+
+.btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0px 0px 0px rgba(0,0,0,0.05);
+}
+
 .btn-primary {
   background: var(--accent-blue);
   color: #fff;
-  box-shadow: 0 0 16px rgba(79,142,247,0.25);
+  border: 3px solid #003d99;
 }
-.btn-primary:hover { background: #6b9ef9; box-shadow: 0 0 20px rgba(79,142,247,0.4); }
-.btn-ghost {
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-}
-.btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-light); }
-.btn-danger {
-  background: rgba(239,68,68,0.1);
-  color: var(--log-error);
-  border: 1px solid rgba(239,68,68,0.25);
-}
-.btn-danger:hover { background: rgba(239,68,68,0.2); }
-.btn-success {
-  background: rgba(16,185,129,0.1);
-  color: var(--log-success);
-  border: 1px solid rgba(16,185,129,0.25);
-}
-.btn-success:hover { background: rgba(16,185,129,0.2); }
-.btn-sm { padding: 5px 10px; font-size: 11px; }
 
-/* CARD */
+.btn-primary:hover {
+  background: #0052cc;
+  transform: translate(2px, 2px);
+}
+
+.btn-primary:active {
+  transform: translate(4px, 4px);
+}
+
+.btn-danger {
+  background: var(--accent-red);
+  color: #fff;
+  border: 3px solid #991f1f;
+}
+
+.btn-danger:hover {
+  background: #991f1f;
+  transform: translate(2px, 2px);
+}
+
+.btn-success {
+  background: var(--log-success);
+  color: #fff;
+  border: 3px solid #15803d;
+}
+
+.btn-success:hover {
+  background: #15803d;
+  transform: translate(2px, 2px);
+}
+
+.btn-ghost {
+  background: var(--secondary-background);
+  color: var(--foreground);
+  border: 3px solid var(--border);
+}
+
+.btn-ghost:hover {
+  background: var(--main);
+  transform: translate(2px, 2px);
+}
+
+.btn-sm {
+  padding: 8px 12px;
+  font-size: 11px;
+  border: 2px solid var(--border);
+}
+
+.btn-sm:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px rgba(0,0,0,0.1);
+}
+
+.btn-sm:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0px 0px 0px rgba(0,0,0,0.05);
+}
+
+
+/* CARD - Neobrutalism Style */
 .card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--secondary-background);
+  border: 3px solid var(--border);
+  border-radius: 10px;
   box-shadow: var(--shadow-sm);
 }
+
 .card-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 20px;
+  border-bottom: 3px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  background: var(--secondary-background);
 }
+
 .card-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: 0.04em;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--foreground);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   text-transform: uppercase;
 }
 .card-body { padding: 12px 16px; }

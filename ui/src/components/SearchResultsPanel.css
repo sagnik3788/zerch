@@ -3,6 +3,10 @@
     flex-direction: column;
     overflow: hidden;
     height: 100%;
+    background: var(--secondary-background);
+    border: 3px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
 }
 
 .search-results-stream {
@@ -27,20 +31,23 @@
 .no-results-icon {
     font-size: 48px;
     margin-bottom: 16px;
-    opacity: 0.6;
+    opacity: 1;
 }
 
 .results-empty__text {
     font-size: 14px;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-weight: 700;
+    color: var(--foreground);
     margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .results-empty__subtitle {
     font-size: 12px;
     color: var(--text-muted);
     margin: 0;
+    font-weight: 600;
 }
 
 .results-summary {
@@ -53,37 +60,43 @@
 .summary-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    background: rgba(79, 142, 247, 0.1);
-    border: 1px solid rgba(79, 142, 247, 0.3);
-    border-radius: var(--radius-sm);
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-surface);
+    border: 2px solid var(--accent-blue);
+    border-radius: 0px;
     font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .badge-label {
     color: var(--text-muted);
-    font-weight: 500;
+    font-weight: 700;
 }
 
 .badge-value {
     color: var(--accent-blue);
-    font-weight: 700;
+    font-weight: 900;
 }
 
 .search-result-entry {
     display: flex;
     gap: 12px;
-    padding: 12px;
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    padding: 14px;
+    background: var(--bg-surface);
+    border: 2px solid var(--border);
+    border-radius: 0px;
     transition: all var(--transition);
+    box-shadow: var(--shadow-offset);
 }
 
 .search-result-entry:hover {
-    background: rgba(79, 142, 247, 0.05);
+    background: #f0ede9;
     border-color: var(--accent-blue);
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0px rgba(0,0,0,0.1);
 }
 
 .result-rank {
@@ -91,13 +104,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     background: var(--accent-blue);
     color: white;
-    border-radius: var(--radius-sm);
-    font-weight: 700;
-    font-size: 12px;
+    border-radius: 0px;
+    font-weight: 900;
+    font-size: 13px;
+    border: 2px solid #003d99;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .result-content {

@@ -1,17 +1,27 @@
+import { useNavigate } from '../hooks/useNavigate';
 import './Topbar.css';
 
 export default function Topbar({ thinking }) {
+    const navigate = useNavigate();
+
+    const handleLogoClick = () => {
+        navigate('/');
+    };
+
     return (
         <header className="topbar">
             <div className="topbar-left">
-                <div className="topbar-logo">
+                <button 
+                    className="topbar-logo"
+                    onClick={handleLogoClick}
+                >
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#4f8ef7" strokeWidth="1.8" strokeLinejoin="round" />
                         <path d="M2 17l10 5 10-5" stroke="#8b5cf6" strokeWidth="1.8" strokeLinejoin="round" />
                         <path d="M2 12l10 5 10-5" stroke="#22d3ee" strokeWidth="1.8" strokeLinejoin="round" />
                     </svg>
                     <span className="topbar-brand">Zerch</span>
-                </div>
+                </button>
                 <div className="topbar-sep" />
                 <span className="topbar-subtitle">AI Log Debugger</span>
             </div>
