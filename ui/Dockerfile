@@ -29,5 +29,5 @@ COPY --from=builder /app/dist ./dist
 # Expose port
 EXPOSE 5173
 
-# Serve the application
-CMD ["serve", "-s", "dist", "-l", "5173"]
+# Listen on all interfaces so Docker port publish (5173->5173) works from the internet
+CMD ["serve", "-s", "dist", "-l", "tcp://0.0.0.0:5173"]
