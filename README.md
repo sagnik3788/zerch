@@ -1,15 +1,11 @@
 <div align="center">
 
 <br/>
-A vector search engine for logs.
 
 ## Demo
 
 - **Live Demo:** https://zerch-pvt.vercel.app/
 - **YouTube Walkthrough:** https://www.youtube.com/watch?v=kKXEW9pN6_E
-
-## Architecture(will update)
-
 
 ```
                 ███████╗███████╗██████╗  ██████╗██╗  ██╗
