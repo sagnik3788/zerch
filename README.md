@@ -55,7 +55,7 @@
 
 ### 🏠 Home Page — The Landing Experience
 
-![Zerch Home Page](./ProjectDemo%20/Home_Page.png)
+![Zerch Home Page](./ProjectDemo/Home_Page.png)
 
 *The Zerch landing page greets users with a bold, neobrutalist design. It highlights the core value proposition — a vector search engine built in Rust — with live stats showing 10M+ vectors indexed, sub-millisecond query times, and 100% Rust-native performance.*
 
@@ -63,7 +63,7 @@
 
 ### 🔐 Authentication — Secure Access
 
-![Zerch Auth Page](./ProjectDemo%20/Auth_Page.png)
+![Zerch Auth Page](./ProjectDemo/Auth_Page.png)
 
 *A clean split-panel login screen. The left side reinforces the brand identity with a golden yellow background, while the right side hosts the login form with demo credentials visible for easy onboarding.*
 
@@ -71,7 +71,7 @@
 
 ### ⚙️ Dashboard — The Core Search & Analysis Engine
 
-![Zerch Dashboard Page](./ProjectDemo%20/Dashboard_Page.png)
+![Zerch Dashboard Page](./ProjectDemo/Dashboard_Page.png)
 
 *The main AI Log Debugger dashboard. A live topbar shows indexed vectors, active incidents, P99 latency, and service count. Users can search with natural language, filter by severity/service/time, upload log files via drag-and-drop, and trigger AI summarization — all in one view.*
 
@@ -79,7 +79,7 @@
 
 ### ✨ Features & Technology — What's Under the Hood
 
-![Zerch Features Page](./ProjectDemo%20/Features_Page.png)
+![Zerch Features Page](./ProjectDemo/Features_Page.png)
 
 *The marketing features page showcases four core capabilities: Ultra-Fast Search, Semantic Understanding, Log Analysis, and Enterprise Grade reliability — along with the modern technology pillars that power them.*
 
