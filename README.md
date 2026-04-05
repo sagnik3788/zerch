@@ -2,11 +2,6 @@
 
 <br/>
 
-## Demo
-
-- **Live Demo:** https://zerch-pvt.vercel.app/
-- **YouTube Walkthrough:** https://www.youtube.com/watch?v=kKXEW9pN6_E
-
 ```
                 ███████╗███████╗██████╗  ██████╗██╗  ██╗
                 ╚══███╔╝██╔════╝██╔══██╗██╔════╝██║  ██║
@@ -19,6 +14,13 @@
 ### ⚡ Vector-Powered Semantic Log Search Engine
 
 **Built with Rust. Powered by AI. Designed for Engineers.**
+
+---
+
+## Demo
+
+- **Live Demo:** https://zerch-pvt.vercel.app/
+- **YouTube Walkthrough:** https://www.youtube.com/watch?v=kKXEW9pN6_E
 
 <br/>
 
