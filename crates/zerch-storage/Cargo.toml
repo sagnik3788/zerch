@@ -2,8 +2,16 @@
 name = "zerch-storage"
 version = "0.1.0"
 edition = "2021"
+description = "Binary vector store with Qdrant integration"
+license = "MIT"
+repository = "https://github.com/sagnik222/Zerch"
+homepage = "https://github.com/sagnik222/Zerch"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-bincode = "1.3"
 anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+qdrant-client = "1.13"
+uuid = { version = "1.6", features = ["v4"] }
+log = "0.4"

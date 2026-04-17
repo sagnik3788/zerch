@@ -2,5 +2,9 @@
 name = "zerch-core"
 version = "0.1.0"
 edition = "2021"
+description = "Distance metrics for vector similarity search (cosine, euclidean)"
+license = "MIT"
+repository = "https://github.com/sagnik3788/Zerch"
+homepage = "https://github.com/sagnik3788/Zerch"
 
 [dependencies]

@@ -3,17 +3,21 @@ use actix_multipart::Multipart;
 use actix_web::{get, middleware, post, web, App, HttpResponse, HttpServer};
 use chrono::Local;
 use futures_util::stream::StreamExt;
-use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::io::Read;
-use std::sync::{Arc, Mutex};
-use uuid::Uuid;
-use zerch_core::cosine_similarity;
-use zerch_embed::LocalEmbedder;
-use zerch_storage::VectorStore;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::process::Command;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use uuid::Uuid;
+use zerch_embed::LocalEmbedder;
+use zerch_storage::QdrantStore;
 
 mod summarize;
+
+// ---------------------------------------------------------------------------
+// Data models
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
@@ -22,7 +26,15 @@ pub struct LogEntry {
     pub level: String,
     pub service: String,
     pub msg: String,
+    pub template: String,
+    pub params: Vec<ExtractedParam>,
     pub similarity: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtractedParam {
+    pub value: String,
+    pub mask_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -55,6 +67,10 @@ pub struct SearchResponse {
     pub message: String,
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 fn extract_log_level(line: &str) -> String {
     let lower = line.to_lowercase();
     if lower.contains("error") || lower.contains("err") {
@@ -83,91 +99,57 @@ fn extract_service(line: &str) -> String {
     "unknown".to_string()
 }
 
-fn search_vectors(
-    query: &str,
-    embedder: &mut LocalEmbedder,
-    store_path: &str,
-    limit: usize,
-) -> Result<Vec<SearchResult>, String> {
-    // Embed the query
-    let query_vector = embedder.embed(query).map_err(|e| format!("Embed error: {}", e))?;
+fn get_drain3_template(log_line: &str) -> Option<(String, Vec<ExtractedParam>)> {
+    let output = Command::new("python3")
+        .args([
+            "-c",
+            &format!(
+                r#"import json; import sys; sys.path.insert(0, '/home/sagnik/Zerch'); from drain3_wrapper import ZerchDrain3; d = ZerchDrain3(); r = d.process_log('{}'); print(json.dumps(r))"#,
+                log_line.replace("'", "'\\''")
+            ),
+        ])
+        .output()
+        .ok()?;
 
-    let mut file = File::open(store_path).map_err(|e| format!("File error: {}", e))?;
-    let mut top_matches: Vec<(f32, String, usize)> = Vec::new();
-    let mut result_id = 0;
-
-    // Loop over each vector+text and compute similarity
-    loop {
-        // Read the vector length
-        let mut len_buf = [0u8; 4];
-        if file.read_exact(&mut len_buf).is_err() {
-            break;
-        }
-        let vec_len = u32::from_le_bytes(len_buf) as usize;
-
-        // Read vector data
-        let mut vec_bytes = vec![0u8; vec_len * 4];
-        if file.read_exact(&mut vec_bytes).is_err() {
-            break;
-        }
-
-        // Convert bytes to f32 vector
-        let mut log_vector = Vec::with_capacity(vec_len);
-        for chunk in vec_bytes.chunks_exact(4) {
-            let bytes: [u8; 4] = chunk.try_into().unwrap();
-            log_vector.push(f32::from_le_bytes(bytes));
-        }
-
-        // Compute cosine similarity
-        let score = cosine_similarity(&query_vector, &log_vector).score;
-
-        // Read text length
-        let mut len_buf = [0u8; 4];
-        if file.read_exact(&mut len_buf).is_err() {
-            break;
-        }
-        let text_len = u32::from_le_bytes(len_buf) as usize;
-
-        // Read text bytes
-        let mut text_bytes = vec![0u8; text_len];
-        if file.read_exact(&mut text_bytes).is_err() {
-            break;
-        }
-        let text = String::from_utf8_lossy(&text_bytes).into_owned();
-
-        // Track top results
-        top_matches.push((score, text, result_id));
-        top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-        top_matches.truncate(limit);
-
-        result_id += 1;
+    if !output.status.success() {
+        return None;
     }
 
-    // Convert to SearchResult format
-    let results = top_matches
-        .into_iter()
-        .map(|(score, text, id)| SearchResult {
-            id: format!("result-{}", id),
-            score,
-            text,
-        })
-        .collect();
-
-    Ok(results)
+    let json_str = String::from_utf8_lossy(&output.stdout);
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
+        let template = parsed.get("template")?.as_str()?.to_string();
+        let params: Vec<ExtractedParam> = parsed
+            .get("params")?
+            .as_array()?
+            .iter()
+            .filter_map(|p| {
+                Some(ExtractedParam {
+                    value: p.get("value")?.as_str()?.to_string(),
+                    mask_name: p.get("mask_name")?.as_str()?.to_string(),
+                })
+            })
+            .collect();
+        return Some((template, params));
+    }
+    None
 }
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
 
 #[post("/api/upload")]
 async fn upload_logs(
     mut payload: Multipart,
     embedder: web::Data<Arc<Mutex<LocalEmbedder>>>,
-    store: web::Data<Arc<VectorStore>>,
+    store: web::Data<Arc<QdrantStore>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let mut logs = Vec::new();
-    let mut total_indexed = 0u32;
+    let mut logs: Vec<LogEntry> = Vec::new();
+    let mut total_indexed: u32 = 0;
 
-    // Clear the previous vectors so only the new log file's embeddings are stored
-    if let Err(e) = store.clear() {
-        log::error!("Failed to clear vector store: {}", e);
+    // Wipe the previous collection so only the new file's embeddings remain.
+    if let Err(e) = store.clear().await {
+        log::error!("Failed to clear Qdrant collection: {}", e);
         return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
             "success": false,
             "message": format!("Failed to clear vector store: {}", e)
@@ -179,7 +161,7 @@ async fn upload_logs(
         let field_name = field.name().to_string();
 
         if field_name == "file" {
-            let mut file_content = Vec::new();
+            let mut file_content: Vec<u8> = Vec::new();
             while let Some(chunk) = field.next().await {
                 let data = chunk?;
                 file_content.extend_from_slice(&data);
@@ -187,51 +169,78 @@ async fn upload_logs(
 
             let content_str = String::from_utf8_lossy(&file_content);
             let lines: Vec<&str> = content_str.lines().collect();
-
             log::info!("Processing file with {} lines", lines.len());
+
+            let mut batch: Vec<(Vec<f32>, serde_json::Value)> = Vec::new();
+            let mut seen_templates: HashMap<String, Vec<f32>> = HashMap::new();
+            const BATCH_SIZE: usize = 64;
 
             for (idx, line) in lines.iter().enumerate() {
                 if line.trim().is_empty() {
                     continue;
                 }
 
-                let level = extract_log_level(line);
-                let ts = extract_timestamp(line);
-                let service = extract_service(line);
-                let msg = line.to_string();
+                let raw_log = line.to_string();
 
-                // Embed the log line using the Rust engine
-                let vector = match embedder.lock() {
-                    Ok(mut emb) => match emb.embed(&msg) {
-                        Ok(vec) => vec,
-                        Err(e) => {
-                            log::error!("Failed to embed log: {}", e);
-                            vec![0.5; 384]
+                let (template, params) = get_drain3_template(&raw_log)
+                    .unwrap_or((raw_log.clone(), vec![]));
+
+                let vector = if let Some(cached_vector) = seen_templates.get(&template) {
+                    log::debug!("Template already exists: {} - re-using vector", template);
+                    cached_vector.clone()
+                } else {
+                    let vector = {
+                        let mut emb = embedder.lock().await;
+                        match emb.embed(&template) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                log::error!("Failed to embed template: {}", e);
+                                vec![0.5; 384]
+                            }
                         }
-                    },
-                    Err(e) => {
-                        log::error!("Failed to lock embedder: {}", e);
-                        vec![0.5; 384]
-                    }
+                    };
+                    seen_templates.insert(template.clone(), vector.clone());
+                    vector
                 };
 
-                // Store the vector and text in the vector store
-                if let Err(e) = store.append_vector(&vector, &msg) {
-                    log::error!("Failed to store vector: {}", e);
+                let entry_id = format!("log-{}", Uuid::new_v4());
+
+                let payload = serde_json::json!({
+                    "raw_log": raw_log,
+                    "template": template,
+                    "params": params,
+                    "cluster_id": entry_id
+                });
+
+                batch.push((vector.clone(), payload.clone()));
+
+                if batch.len() >= BATCH_SIZE {
+                    if let Err(e) = store.append_templates_batch(&batch).await {
+                        log::error!("Failed to batch upsert: {}", e);
+                    }
+                    batch.clear();
                 }
 
                 let log_entry = LogEntry {
-                    id: format!("log-{}-{}", Uuid::new_v4(), idx),
-                    ts,
-                    level,
-                    service,
-                    msg,
+                    id: entry_id,
+                    ts: extract_timestamp(&raw_log),
+                    level: extract_log_level(&raw_log),
+                    service: extract_service(&raw_log),
+                    msg: raw_log,
+                    template,
+                    params,
                     similarity: 0.75,
                 };
 
                 log::info!("[{}] Indexed: {}", total_indexed + 1, log_entry.msg);
                 logs.push(log_entry);
                 total_indexed += 1;
+            }
+
+            if !batch.is_empty() {
+                if let Err(e) = store.append_templates_batch(&batch).await {
+                    log::error!("Failed to batch upsert remaining: {}", e);
+                }
             }
         }
     }
@@ -240,10 +249,10 @@ async fn upload_logs(
         success: true,
         logs,
         count: total_indexed as usize,
-        message: format!("Successfully indexed {} logs", total_indexed),
+        message: format!("Successfully indexed {} logs into Qdrant", total_indexed),
     };
 
-    log::info!("Upload complete: {} logs indexed", total_indexed);
+    log::info!("Upload complete: {} logs indexed into Qdrant", total_indexed);
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -251,7 +260,7 @@ async fn upload_logs(
 async fn health() -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "status": "healthy",
-        "engine": "Running (Rust)"
+        "engine": "Running (Rust + Qdrant)"
     }))
 }
 
@@ -259,7 +268,7 @@ async fn health() -> HttpResponse {
 async fn search(
     query: web::Query<SearchQuery>,
     embedder: web::Data<Arc<Mutex<LocalEmbedder>>>,
-    store: web::Data<Arc<VectorStore>>,
+    store: web::Data<Arc<QdrantStore>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let search_query = query.q.trim().to_string();
 
@@ -270,29 +279,142 @@ async fn search(
         })));
     }
 
-    let limit = query.limit.unwrap_or(5);
-    let store_path = store.path.to_string_lossy().to_string();
-    let embedder_arc = embedder.clone();
-    let query_copy = search_query.clone();
+    let limit = query.limit.unwrap_or(5) as u64;
 
-    // Search in a blocking context to avoid blocking async runtime
-    let search_results = web::block(move || {
-        let mut guard = embedder_arc.lock().map_err(|e| {
-            log::error!("Lock failed: {}", e);
-            format!("Lock error: {}", e)
-        })?;
-
-        search_vectors(&query_copy, &mut guard, &store_path, limit)
-    })
-    .await
-    .map_err(|e| {
-        log::error!("Blocking task error: {}", e);
-        actix_web::error::ErrorInternalServerError("Task error")
-    })?
-    .map_err(|e| {
-        log::error!("Search error: {}", e);
-        actix_web::error::ErrorInternalServerError(e)
+    // Auto-reindex if no data
+    let count = store.count().await.map_err(|e| {
+        log::error!("Count error: {}", e);
+        actix_web::error::ErrorInternalServerError(format!("Count error: {}", e))
     })?;
+    if count == 0 {
+        log::info!("No data found, triggering auto-reindex from test.log...");
+        let test_log = std::path::Path::new("test.log");
+        if test_log.exists() {
+            let file = std::fs::File::open(test_log)?;
+            let reader = std::io::BufReader::new(file);
+            use std::io::BufRead;
+            
+            store.clear().await.map_err(|e| {
+                log::error!("Clear error: {}", e);
+                actix_web::error::ErrorInternalServerError(format!("Clear error: {}", e))
+            })?;
+
+            let mut embedder = embedder.lock().await;
+            let mut batch: Vec<(Vec<f32>, serde_json::Value)> = Vec::new();
+            const BATCH_SIZE: usize = 64;
+
+            for line in reader.lines() {
+                if let Ok(raw_log) = line {
+                    if raw_log.is_empty() {
+                        continue;
+                    }
+                    let vector = match embedder.embed(&raw_log) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!("Embed error: {}", e);
+                            continue;
+                        }
+                    };
+                    let (template, params) = get_drain3_template(&raw_log).unwrap_or((raw_log.clone(), vec![]));
+                    let payload = serde_json::json!({
+                        "raw_log": raw_log,
+                        "template": template,
+                        "params": params
+                    });
+                    batch.push((vector, payload));
+                    if batch.len() >= BATCH_SIZE {
+                        if let Err(e) = store.append_templates_batch(&batch).await {
+                            log::error!("Batch upsert error: {}", e);
+                        }
+                        batch.clear();
+                    }
+                }
+            }
+            if !batch.is_empty() {
+                if let Err(e) = store.append_templates_batch(&batch).await {
+                    log::error!("Final batch upsert error: {}", e);
+                }
+            }
+        } else {
+            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "success": false,
+                "message": "No data found and test.log not found - please upload a log file"
+            })));
+        }
+    }
+
+    // Embed the raw query directly (matching CLI behavior - not using template)
+    let query_vector = {
+        let mut emb = embedder.lock().await;
+        emb.embed(&search_query).map_err(|e| {
+            log::error!("Embed error: {}", e);
+            actix_web::error::ErrorInternalServerError(format!("Embed error: {}", e))
+        })?
+    };
+
+    // Search Qdrant with more results for metadata filtering
+    let fetch_limit = std::cmp::max(limit * 3, 30);
+    let raw_results = store.search_with_metadata(query_vector, fetch_limit).await.map_err(|e| {
+        log::error!("Qdrant search error: {}", e);
+        actix_web::error::ErrorInternalServerError(format!("Search error: {}", e))
+    })?;
+
+    // Extract search params from query (IP addresses, numbers, etc.)
+    let search_terms: Vec<&str> = search_query.split_whitespace().collect();
+    let query_ips: Vec<&str> = search_terms.iter()
+        .filter(|s| s.contains('.') && s.chars().filter(|c| *c == '.').count() == 3)
+        .map(|s| *s)
+        .collect();
+    let query_numbers: Vec<&str> = search_terms.iter()
+        .filter(|s| s.chars().all(|c| c.is_ascii_digit() || c == '.'))
+        .map(|s| *s)
+        .collect();
+
+    // Filter and re-rank by metadata match
+    let mut scored_results: Vec<(f32, String, bool)> = raw_results
+        .into_iter()
+        .map(|(score, text, metadata)| {
+            // Check if metadata contains search values
+            let metadata_str = serde_json::to_string(&metadata).unwrap_or_default();
+            let mut is_exact_match = false;
+            
+            // Check IP matches
+            for ip in &query_ips {
+                if metadata_str.contains(ip) {
+                    is_exact_match = true;
+                    break;
+                }
+            }
+            // Check number matches  
+            if !is_exact_match {
+                for num in &query_numbers {
+                    if metadata_str.contains(num) {
+                        is_exact_match = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Exact match gets score boost
+            let boosted_score = if is_exact_match { score * 1.0 + 0.1 } else { score };
+            (boosted_score, text, is_exact_match)
+        })
+        .collect();
+
+    // Sort by boosted score
+    scored_results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Take top results
+    let search_results: Vec<SearchResult> = scored_results
+        .into_iter()
+        .take(limit as usize)
+        .enumerate()
+        .map(|(i, (score, text, _))| SearchResult {
+            id: format!("result-{}", i),
+            score,
+            text,
+        })
+        .collect();
 
     let count = search_results.len();
     let response = SearchResponse {
@@ -303,15 +425,17 @@ async fn search(
         message: format!("Found {} matching logs", count),
     };
 
-    log::info!("Search complete: {} results", count);
+    log::info!("Search complete: {} results from Qdrant", count);
     Ok(HttpResponse::Ok().json(response))
 }
 
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
-    dotenv::dotenv().ok(); 
-
+    dotenv::dotenv().ok();
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
     log::info!("Loading embedding model... this might take a moment.");
@@ -326,7 +450,28 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    let store = Arc::new(VectorStore::new("zerch_data.bin"));
+    let qdrant_url = std::env::var("QDRANT_URL")
+        .unwrap_or_else(|_| "http://localhost:6334".to_string());
+
+    log::info!("Connecting to Qdrant at {}...", qdrant_url);
+    let store = match QdrantStore::new(&qdrant_url).await {
+        Ok(s) => {
+            log::info!("Connected to Qdrant");
+            s
+        }
+        Err(e) => {
+            log::error!("Failed to connect to Qdrant: {}", e);
+            panic!("Cannot start server without Qdrant");
+        }
+    };
+
+    // Ensure the collection is ready
+    if let Err(e) = store.init_collection().await {
+        log::error!("Failed to initialize Qdrant collection: {}", e);
+        panic!("Cannot initialize Qdrant collection");
+    }
+
+    let store = Arc::new(store);
     let client = Client::new();
 
     let host = std::env::var("ZERCH_API_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());

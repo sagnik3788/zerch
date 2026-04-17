@@ -2,9 +2,14 @@
 name = "zerch-engine"
 version = "0.1.0"
 edition = "2021"
+description = "CLI tool for indexing and searching log files"
+license = "MIT"
+repository = "https://github.com/sagnik222/Zerch"
+homepage = "https://github.com/sagnik222/Zerch"
 
 [dependencies]
-zerch-embed = { path = "../zerch-embed" }
-zerch-storage = { path = "../zerch-storage" }
-zerch-core = { path = "../zerch-core" }
+zerch-embed = "0.1.0"
+zerch-storage = "0.1.0"
+zerch-core = "0.1.0"
 anyhow = "1.0"
+tokio = { version = "1", features = ["full"] }

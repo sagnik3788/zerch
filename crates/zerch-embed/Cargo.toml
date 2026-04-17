@@ -2,6 +2,10 @@
 name = "zerch-embed"
 version = "0.1.0"
 edition = "2021"
+description = "Local embedding model using ONNX Runtime"
+license = "MIT"
+repository = "https://github.com/sagnik222/Zerch"
+homepage = "https://github.com/sagnik222/Zerch"
 
 [dependencies]
 hf-hub = "0.4"

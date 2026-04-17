@@ -1,121 +1,161 @@
 use anyhow::Result;
 use std::env;
 use std::fs::File;
-use std::io::Read;
 use std::io::{BufRead, BufReader};
 use std::time::Instant;
-use zerch_core::cosine_similarity;
 use zerch_embed::LocalEmbedder;
-use zerch_storage::VectorStore;
+use zerch_storage::QdrantStore;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
+
+    let qdrant_url =
+        std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6334".to_string());
+
+    println!("Connecting to Qdrant at {}...", qdrant_url);
+    let store = QdrantStore::new(&qdrant_url).await?;
+    store.init_collection().await?;
 
     println!("Loading model... this might take a moment.");
     let mut embedder = LocalEmbedder::load()?;
-    let store = VectorStore::new("zerch_data.bin");
+
+    if args.len() < 2 {
+        eprintln!("Usage: zerch-engine --search <query>");
+        eprintln!("       zerch-engine <log-file>");
+        return Ok(());
+    }
 
     if args[1] == "--search" {
-        // --- SEARCH  ---
+        // ── SEARCH ─────────────────────────────────────────────────────────
         if args.len() < 3 {
-            println!("Error: Please provide a search query.");
+            eprintln!("Error: Please provide a search query.");
             return Ok(());
+        }
+
+        // Check if data exists, if not re-index
+        let count = store.count().await?;
+        if count == 0 {
+            println!("No data found, re-indexing from test.log...");
+            index_file(&store, &mut embedder, "test.log").await?;
         }
 
         let query = &args[2];
         println!("Searching for: \"{}\"", query);
 
         let start_time = Instant::now();
-
-        // Embed the query
-        let _query_vector = embedder.embed(query)?;
+        let query_vector = embedder.embed(query)?;
         println!("Query embedded in {:?}", start_time.elapsed());
 
-        let mut file = File::open("zerch_data.bin")?;
+        // Extract IPs and numbers from query for metadata filtering
+        let search_terms: Vec<&str> = query.split_whitespace().collect();
+        let query_ips: Vec<&str> = search_terms.iter()
+            .filter(|s| s.contains('.') && s.chars().filter(|c| *c == '.').count() == 3)
+            .map(|s| *s)
+            .collect();
+        let query_numbers: Vec<&str> = search_terms.iter()
+            .filter(|s| s.chars().all(|c| c.is_ascii_digit() || c == '.'))
+            .map(|s| *s)
+            .collect();
 
-        let mut top_matches: Vec<(f32, String)> = Vec::new();
+        // Search with more results for metadata filtering
+        let raw_results = store.search_with_metadata(query_vector, 30).await?;
 
-        // loop over each vector+text and return the top matches
-        loop {
-            // read the vec len
-            let mut len_buf = [0u8; 4];
-            if file.read_exact(&mut len_buf).is_err() {
-                break;
-            }
-            let vec_len = u32::from_le_bytes(len_buf) as usize;
+        // Filter and re-rank by metadata match - check raw text for exact matches
+        let mut scored_results: Vec<(f32, String)> = raw_results
+            .into_iter()
+            .map(|(score, text, _metadata)| {
+                let mut is_exact_match = false;
+                
+                // Check if search values are in the result text
+                for ip in &query_ips {
+                    if text.contains(ip) {
+                        is_exact_match = true;
+                        break;
+                    }
+                }
+                if !is_exact_match {
+                    for num in &query_numbers {
+                        if text.contains(num) {
+                            is_exact_match = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Exact match gets score boost
+                let boosted_score = if is_exact_match { score * 1.0 + 0.1 } else { score };
+                (boosted_score, text)
+            })
+            .collect();
 
-            //read vec data
-            let mut vec_bytes = vec![0u8; vec_len * 4];
-            file.read_exact(&mut vec_bytes)?;
+        scored_results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
-            // Convert
-            let mut log_vector = Vec::with_capacity(vec_len);
-            for chunk in vec_bytes.chunks_exact(4) {
-                let bytes: [u8; 4] = chunk.try_into().unwrap();
-                log_vector.push(f32::from_le_bytes(bytes));
-            }
-
-            let score = cosine_similarity(&_query_vector, &log_vector).score;
-
-            //text len
-            file.read_exact(&mut len_buf)?;
-            let text_len = u32::from_le_bytes(len_buf) as usize;
-
-            // Read Text Bytes
-            let mut text_bytes = vec![0u8; text_len];
-            file.read_exact(&mut text_bytes)?;
-            let text = String::from_utf8_lossy(&text_bytes).into_owned();
-
-            // track of the top results
-            top_matches.push((score, text));
-            top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-            top_matches.truncate(5);
-        }
+        let results: Vec<(f32, String)> = scored_results.into_iter().take(5).collect();
 
         println!("\nTop 5 Results:");
         println!("--------------------------------------------------");
-        for (i, (score, text)) in top_matches.iter().enumerate() {
+        for (i, (score, text)) in results.iter().enumerate() {
             println!("[{}] Score: {:.4} | {}", i + 1, score, text);
         }
     } else {
-        // --- INDEXING  ---
+        // ── INDEXING ────────────────────────────────────────────────────────
         let file_path = &args[1];
-        let file = File::open(file_path)?;
-        let reader = BufReader::new(file);
+        index_file(&store, &mut embedder, file_path).await?;
+    }
 
-        let start_time = Instant::now();
-        let mut count: u32 = 0;
+    Ok(())
+}
 
-        println!("Indexing logs from: {}...", file_path);
+async fn index_file(store: &QdrantStore, embedder: &mut LocalEmbedder, file_path: &str) -> Result<()> {
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
 
-        for line in reader.lines() {
-            let log = line?;
-            if log.is_empty() {
-                continue;
-            }
+    println!("Clearing existing vectors...");
+    store.clear().await?;
 
-            // Generate the vector and store it along with the original text
-            let vector = embedder.embed(&log)?;
-            store.append_vector(&vector, &log)?;
+    let start_time = Instant::now();
+    let mut count: u32 = 0;
+    let mut batch: Vec<(Vec<f32>, String)> = Vec::new();
+    const BATCH_SIZE: usize = 64;
 
-            count += 1;
-            println!("[{}] Indexed: {}", count, log);
+    println!("Indexing logs from: {}...", file_path);
+
+    for line in reader.lines() {
+        let log = line?;
+        if log.is_empty() {
+            continue;
         }
 
-        let total_duration = start_time.elapsed();
-        let avg_per_log = if count > 0 {
-            total_duration / count
-        } else {
-            total_duration
-        };
+        let vector = embedder.embed(&log)?;
+        batch.push((vector, log.clone()));
 
-        println!("\nAll logs have been successfully stored in zerch_data.bin!");
-        println!("--------------------------------------------------");
-        println!("Total logs indexed: {}", count);
-        println!("Total Indexing Time: {:?}", total_duration);
-        println!("Average time per log: {:?}", avg_per_log);
-        println!("--------------------------------------------------");
+        count += 1;
+        println!("[{}] Embedded: {}", count, log);
+
+        if batch.len() >= BATCH_SIZE {
+            store.append_vectors_batch(&batch).await?;
+            batch.clear();
+        }
     }
+
+    if !batch.is_empty() {
+        store.append_vectors_batch(&batch).await?;
+    }
+
+    let total_duration = start_time.elapsed();
+    let avg_per_log = if count > 0 {
+        total_duration / count
+    } else {
+        total_duration
+    };
+
+    println!("\nAll logs successfully stored in Qdrant!");
+    println!("--------------------------------------------------");
+    println!("Total logs indexed: {}", count);
+    println!("Total Indexing Time: {:?}", total_duration);
+    println!("Average time per log: {:?}", avg_per_log);
+    println!("--------------------------------------------------");
 
     Ok(())
 }
